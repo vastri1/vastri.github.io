@@ -218,9 +218,6 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
 .player-link:hover { text-decoration: underline; opacity: 0.8; }
 .td-player-inner img { width: 20px; height: 20px; border-radius: 2px; image-rendering: pixelated; flex-shrink: 0; }
 .td-num { text-align: right; font-family: monospace; font-size: 13px; }
-.td-bar { width: 80px; padding-right: 1rem; }
-.bar-track { height: 3px; background: var(--border); }
-.bar-fill { height: 100%; background: #111; transition: width 0.4s ease; }
 
 #no-results { display: none; padding: 2.5rem; text-align: center; color: var(--muted); font-size: 13px; }
 
@@ -564,7 +561,6 @@ function renderThead() {
   document.getElementById('thead').innerHTML = `<tr>
     <th onclick="setSort('#')" id="th-rank"># <span class="sort-icon">↕</span></th>
     ${headers.map(h => `<th onclick="setSort('${h}')" id="th-${h.replace(/\W/g,'_')}">${h} <span class="sort-icon">↕</span></th>`).join('')}
-    <th>—</th>
   </tr>`;
 }
 
@@ -610,15 +606,15 @@ function renderTbody(data) {
   document.getElementById('result-count').textContent = `${filtered.length} / ${allRows.length}`;
   document.getElementById('no-results').style.display = filtered.length ? 'none' : 'block';
 
-  const nc = numCols();
-  const primaryCol = nc[0];
-  const maxVal = primaryCol ? Math.max(...allRows.map(r => toNum(r[primaryCol])), 1) : 1;
   const MEDALS = ['🥇','🥈','🥉'];
 
-  document.getElementById('tbody').innerHTML = filtered.map((row, i) => {
-    const rankCell = i < 3
-      ? `<span class="medal">${MEDALS[i]}</span>`
-      : `<span style="color:var(--muted)">${i+1}</span>`;
+  // Use global sorted order to determine rank, filter is just a visual subset
+  const sortedAll = data; // data is already sorted by applySort
+  document.getElementById('tbody').innerHTML = filtered.map((row) => {
+    const rank = sortedAll.indexOf(row);
+    const rankCell = rank < 3
+      ? `<span class="medal">${MEDALS[rank]}</span>`
+      : `<span style="color:var(--muted)">${rank+1}</span>`;
     const cells = headers.map(h => {
       if (isNum(h)) return `<td class="td-num">${Number(row[h]).toLocaleString()}</td>`;
       const playerName = row[h] || '—';
@@ -628,11 +624,9 @@ function renderTbody(data) {
         : playerName;
       return `<td class="td-player"><div class="td-player-inner"><img src="${skinUrl}" alt="" onerror="this.src='https://mc-heads.net/avatar/'+encodeURIComponent('${playerName}')+'/20'; this.onerror=function(){this.style.display='none'}">${nameLink}</div></td>`;
     }).join('');
-    const barPct = primaryCol ? (toNum(row[primaryCol]) / maxVal * 100).toFixed(1) : 0;
     return `<tr>
       <td class="td-rank">${rankCell}</td>
       ${cells}
-      <td class="td-bar"><div class="bar-track"><div class="bar-fill" style="width:${barPct}%"></div></div></td>
     </tr>`;
   }).join('');
 }
@@ -770,7 +764,7 @@ function toggleTheme() {
   const html = document.documentElement;
   const isDark = html.getAttribute('data-theme') === 'dark';
   html.setAttribute('data-theme', isDark ? 'light' : 'dark');
-  document.getElementById('theme-toggle').textContent = isDark ? '☼ Dark' : '☀ Light';
+  document.getElementById('theme-toggle').textContent = isDark ? '🌑 Dark' : '☀ Light';
 }
 </script>
 </body>
