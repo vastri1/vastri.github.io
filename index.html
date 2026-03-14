@@ -432,7 +432,7 @@ function renderTbody(data) {
     const cells = headers.map(h => {
       if (isNum(h)) return `<td class="td-num">${Number(row[h]).toLocaleString()}</td>`;
       const playerName = row[h] || '—';
-      const skinUrl = `https://minotar.net/avatar/${encodeURIComponent(playerName)}/20`;
+      const skinUrl = `https://minotar.net/helm/${encodeURIComponent(playerName)}/20`;
       const nameLink = playerName !== '—'
         ? `<a href="https://namemc.com/profile/${encodeURIComponent(playerName)}" target="_blank" rel="noopener" class="player-link">${playerName}</a>`
         : playerName;
