@@ -89,24 +89,6 @@ header {
 .btn-ghost { background: var(--bg); color: var(--muted); border-color: var(--border); }
 .btn-ghost:hover { background: #111; color: #fff; border-color: #111; }
 
-/* SETUP */
-#setup-panel { max-width: 520px; margin: 4rem auto; }
-.setup-heading { font-size: 1.5rem; font-weight: bold; margin-bottom: 0.4rem; }
-.setup-sub { color: var(--muted); font-size: 13px; margin-bottom: 1.5rem; }
-.input-group {
-  display: flex; gap: 0; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; margin-bottom: 1rem;
-}
-#csv-url {
-  flex: 1; background: var(--bg); border: none; outline: none;
-  color: var(--text); font-family: var(--font); font-size: 13px; padding: 0.5rem 0.75rem;
-}
-#csv-url::placeholder { color: var(--muted); }
-.setup-hint { color: var(--muted); font-size: 12px; line-height: 1.8; }
-.setup-hint code {
-  background: var(--surface); border: 1px solid var(--border);
-  padding: 1px 5px; font-family: monospace; font-size: 11px; color: #111;
-}
-
 /* ERROR */
 #error-msg {
   display: none;
@@ -221,38 +203,6 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
 
 #no-results { display: none; padding: 2.5rem; text-align: center; color: var(--muted); font-size: 13px; }
 
-/* DB UPLOAD */
-.or-divider {
-  display: flex; align-items: center; gap: 0.75rem;
-  color: var(--muted); font-size: 12px; margin: 1rem 0;
-}
-.or-divider::before, .or-divider::after {
-  content: ''; flex: 1; height: 1px; background: var(--border);
-}
-.db-upload-label {
-  display: flex; align-items: center; justify-content: center;
-  gap: 0.5rem; width: 100%;
-  border: 1px dashed var(--border);
-  border-radius: 5px;
-  padding: 0.85rem;
-  font-size: 13px;
-  color: var(--muted);
-  cursor: pointer;
-  transition: border-color 0.2s, color 0.2s;
-}
-.db-upload-label:hover { border-color: var(--text); color: var(--text); }
-#db-file-input { display: none; }
-#table-select-wrap {
-  display: none; margin-top: 0.75rem;
-}
-#table-select {
-  width: 100%; background: var(--bg); border: 1px solid var(--border);
-  border-radius: 4px; color: var(--text); font-family: var(--font);
-  font-size: 13px; padding: 0.45rem 0.75rem; outline: none;
-}
-#table-select:focus { border-color: var(--text); }
-
-
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); }
@@ -298,30 +248,9 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
   <!-- ERROR -->
   <div id="error-msg"></div>
 
-  <!-- SETUP -->
-  <div id="setup-panel">
-    <div class="setup-heading">Your <span>Stats</span>, Visualized.</div>
-    <div class="setup-sub">Paste a direct CSV URL to get started.</div>
-    <div class="input-group">
-      <input id="csv-url" type="text" placeholder="https://yoursite.com/data.csv" />
-      <button class="btn btn-primary" onclick="loadData()">Load →</button>
-    </div>
-    <div class="setup-hint">
-      Supports any publicly accessible CSV file.<br/>
-      For Google Sheets: <code>File → Share → Publish to web → CSV</code>
-    </div>
-    <div class="or-divider">or</div>
-    <label class="db-upload-label" for="db-file-input">
-      ⬆ Upload a SQLite .db file
-    </label>
-    <input type="file" id="db-file-input" accept=".db,.sqlite,.sqlite3" onchange="loadDbFile(event)" />
-    <div id="table-select-wrap">
-      <select id="table-select" onchange="loadTableFromDb()">
-        <option value="">— Select a table —</option>
-      </select>
-    </div>
-    <br/>
-    <button class="btn btn-ghost" style="margin:0 auto" onclick="loadDemo()">Try demo data</button>
+  <!-- LOADING STATE -->
+  <div id="setup-panel" style="text-align:center;padding:4rem 0;color:var(--muted);font-size:13px;">
+    <div id="loading-msg">Loading stats…</div>
   </div>
 
   <!-- DASHBOARD -->
@@ -332,10 +261,7 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
       <div class="section-header">
         <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
           <div class="section-title">Leaderboard</div>
-          <label class="btn btn-ghost" for="db-upload-quick" style="font-size:11px;padding:0.3rem 0.7rem;cursor:pointer;letter-spacing:0.04em;font-weight:bold;">
-            ⬆ Upload .db
-          </label>
-          <input type="file" id="db-upload-quick" accept=".db,.sqlite,.sqlite3" style="display:none" onchange="loadDbFile(event)" />
+          <span id="last-updated" style="font-size:11px;color:var(--muted);letter-spacing:0.03em;"></span>
         </div>
         <div class="table-controls">
           <div class="search-wrap">
@@ -359,97 +285,8 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
 <script>
 // ── STATE ────────────────────────────────────────────────────────────────────
 let allRows = [], headers = [], sortCol = 'Kills', sortAsc = false;
-let refreshInterval = null, countdown = 30;
-let activeUrl = '';
 
-// ── URL LOADING ──────────────────────────────────────────────────────────────
-function loadData() {
-  const url = document.getElementById('csv-url').value.trim();
-  if (!url) return showError('Please enter a CSV URL.');
-  activeUrl = url;
-  fetchAndRender();
-  startRefresh();
-}
-
-async function fetchWithTimeout(url, ms = 10000) {
-  const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), ms);
-  try {
-    const r = await fetch(url, { signal: ctrl.signal });
-    clearTimeout(t);
-    return r;
-  } catch(e) { clearTimeout(t); throw e; }
-}
-
-async function fetchCsv(url) {
-  const attempts = [
-    () => fetchWithTimeout(url),
-    () => fetchWithTimeout(`https://corsproxy.io/?url=${encodeURIComponent(url)}`),
-    () => fetchWithTimeout(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`),
-    () => fetchWithTimeout(`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`),
-  ];
-  for (let i = 0; i < attempts.length; i++) {
-    try {
-      setStatus(`Connecting…`, 'loading');
-      const res = await attempts[i]();
-      if (!res.ok) continue;
-      const text = await res.text();
-      if (text.trim().length > 10 && !text.trim().startsWith('<!')) return text;
-    } catch(e) { /* next */ }
-  }
-  throw new Error('Could not reach the CSV URL. Check that it is publicly accessible.');
-}
-
-async function fetchAndRender() {
-  try {
-    showError('');
-    const text = await fetchCsv(activeUrl);
-    const parsed = parseCsv(text);
-    if (!parsed.headers.length || !parsed.rows.length)
-      throw new Error('The CSV appears empty or could not be parsed.');
-    headers = parsed.headers;
-    allRows = parsed.rows;
-    render();
-    setStatus(`Updated ${new Date().toLocaleTimeString()}`, 'ok');
-    document.getElementById('setup-panel').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-    document.getElementById('header-right').style.display = 'flex';
-  } catch(e) {
-    setStatus('Error', 'error');
-    showError(e.message);
-  }
-}
-
-function refreshNow() {
-  countdown = 30;
-  fetchAndRender();
-}
-
-function startRefresh() {
-  clearInterval(refreshInterval);
-  countdown = 30;
-  updateCountdown();
-  refreshInterval = setInterval(() => {
-    countdown--;
-    if (countdown <= 0) { fetchAndRender(); countdown = 30; }
-    updateCountdown();
-  }, 1000);
-}
-
-function updateCountdown() {
-  const el = document.getElementById('countdown-text');
-  if (el) el.textContent = `${countdown}s`;
-}
-
-function resetApp() {
-  clearInterval(refreshInterval);
-  document.getElementById('setup-panel').style.display = 'block';
-  document.getElementById('dashboard').style.display = 'none';
-  document.getElementById('header-right').style.display = 'none';
-  showError('');
-  setStatus('', 'ok');
-}
-
+// ── HELPERS ──────────────────────────────────────────────────────────────────
 function setStatus(msg, state) {
   const txt = document.getElementById('status-text');
   const dot = document.getElementById('status-dot');
@@ -459,35 +296,12 @@ function setStatus(msg, state) {
 
 function showError(msg) {
   const el = document.getElementById('error-msg');
+  if (!el) return;
   el.textContent = msg;
   el.style.display = msg ? 'block' : 'none';
 }
 
-// ── CSV PARSER ───────────────────────────────────────────────────────────────
-function parseCsv(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return { headers: [], rows: [] };
-  function parseRow(line) {
-    const cells = []; let cur = ''; let q = false;
-    for (const c of line) {
-      if (c === '"') { q = !q; continue; }
-      if (c === ',' && !q) { cells.push(cur.trim()); cur = ''; continue; }
-      cur += c;
-    }
-    cells.push(cur.trim());
-    return cells;
-  }
-  const hdrs = parseRow(lines[0]);
-  const rows = lines.slice(1).filter(l => l.trim()).map(l => {
-    const vals = parseRow(l);
-    const obj = {};
-    hdrs.forEach((h, i) => obj[h] = vals[i] ?? '');
-    return obj;
-  });
-  return { headers: hdrs, rows };
-}
 
-// ── HELPERS ──────────────────────────────────────────────────────────────────
 function isNum(col) {
   return allRows.some(r => r[col] !== '' && !isNaN(+String(r[col]).replace(/,/g,'')));
 }
@@ -633,92 +447,82 @@ function renderTbody(data) {
 
 function filterTable() { applySort(); }
 
-// ── DEMO ─────────────────────────────────────────────────────────────────────
-function loadDemo() {
-  headers = ['Player','Kills','Wins','Deaths','KD'];
-  allRows = [
-    {Player:'Technoblade',Kills:'531',Wins:'120',Deaths:'22',KD:'24.1'},
-    {Player:'Dream',      Kills:'412',Wins:'98', Deaths:'45',KD:'9.2'},
-    {Player:'OffsetBloom',Kills:'342',Wins:'87', Deaths:'54',KD:'6.3'},
-    {Player:'Herobrine',  Kills:'289',Wins:'72', Deaths:'61',KD:'4.7'},
-    {Player:'Jeb_',       Kills:'201',Wins:'55', Deaths:'80',KD:'2.5'},
-    {Player:'xNestorio',  Kills:'145',Wins:'38', Deaths:'102',KD:'1.4'},
-    {Player:'Grian',      Kills:'98', Wins:'25', Deaths:'134',KD:'0.7'},
-    {Player:'Mumbo',      Kills:'61', Wins:'14', Deaths:'189',KD:'0.3'},
-  ];
-  document.getElementById('csv-url').value = '(demo data)';
-  render();
-  document.getElementById('setup-panel').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'block';
-  document.getElementById('header-right').style.display = 'flex';
-  setStatus('Demo mode', 'ok');
-  const _ct = document.getElementById('countdown-text'); if(_ct) _ct.textContent = '';
-}
+// ── GITHUB CONFIG ─────────────────────────────────────────────────────────────
+// Edit these three lines to point to your repo:
+const GH_USER   = 'vastri1';
+const GH_REPO   = 'vastri.github.io';
+const GH_BRANCH = 'main';
+const GH_DB_PATH = 'stats.db';
 
-// ── AUTO-LOAD ─────────────────────────────────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
-  headers = ['Player', 'Games Played', 'Survival Wins', 'Team Wins', 'Kills', 'PvP Deaths', 'PvE Deaths'];
-  allRows = [
-    {Player:'OffsetBloom',   'Games Played':'84',  'Survival Wins':'0', 'Team Wins':'0', Kills:'12',  'PvP Deaths':'0', 'PvE Deaths':'24'},
-    {Player:'nootherchoice', 'Games Played':'72',  'Survival Wins':'0', 'Team Wins':'0', Kills:'0',   'PvP Deaths':'0', 'PvE Deaths':'0'},
-    {Player:'mickae',        'Games Played':'120', 'Survival Wins':'0', 'Team Wins':'0', Kills:'180', 'PvP Deaths':'0', 'PvE Deaths':'60'},
-  ];
-  render();
-  document.getElementById('setup-panel').style.display = 'none';
-  document.getElementById('dashboard').style.display = 'block';
-  document.getElementById('header-right').style.display = 'flex';
-  setStatus('Loaded', 'ok');
-  const _ct = document.getElementById('countdown-text'); if(_ct) _ct.textContent = '';
-});
-
-
-// ── SQLITE DB LOADING ─────────────────────────────────────────────────────────
+// ── SQLITE DB LOADING FROM GITHUB ─────────────────────────────────────────────
 let dbInstance = null;
 
-async function loadDbFile(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+async function loadDbFromGitHub() {
+  setStatus('Loading stats…', 'loading');
   showError('');
+
+  const rawUrl = `https://raw.githubusercontent.com/${GH_USER}/${GH_REPO}/${GH_BRANCH}/${GH_DB_PATH}`;
+
   try {
+    // Fetch the binary .db file
+    const res = await fetch(rawUrl);
+    if (!res.ok) throw new Error(`GitHub returned ${res.status}. Make sure stats.db is uploaded to your repo.`);
+    const buf = await res.arrayBuffer();
+
     const SQL = await initSqlJs({
-      locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${file}`
+      locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/${f}`
     });
-    const buf = await file.arrayBuffer();
     dbInstance = new SQL.Database(new Uint8Array(buf));
-
-    // Get all table names
-    const res = dbInstance.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
-    if (!res.length || !res[0].values.length) {
-      showError('No tables found in this database file.');
-      return;
-    }
-    const tables = res[0].values.map(r => r[0]);
-
-    const sel = document.getElementById('table-select');
-    sel.innerHTML = '<option value="">— Select a table —</option>' +
-      tables.map(t => `<option value="${t}">${t}</option>`).join('');
-    document.getElementById('table-select-wrap').style.display = 'block';
-
-    // Auto-select if only one table
-    if (tables.length === 1) {
-      sel.value = tables[0];
-      loadTableFromDb();
-    }
+    loadTableFromDb();
   } catch(e) {
-    showError('Failed to read .db file: ' + e.message);
+    setStatus('Error', 'error');
+    const loadingMsg = document.getElementById('loading-msg');
+    if (loadingMsg) loadingMsg.innerHTML = `
+      <div style="font-size:1.1rem;font-weight:bold;color:var(--text);margin-bottom:0.5rem;">⚠ Could not load stats.db</div>
+      <div style="margin-bottom:1rem;">${e.message}</div>
+      <div style="font-size:12px;">Make sure <code style="background:var(--surface);padding:1px 5px;border:1px solid var(--border);">stats.db</code> is uploaded to your GitHub repo, then refresh the page.</div>
+    `;
   }
+
+  // Also fetch the last-commit date from GitHub API
+  fetchLastUpdated();
+}
+
+async function fetchLastUpdated() {
+  try {
+    const apiUrl = `https://api.github.com/repos/${GH_USER}/${GH_REPO}/commits?path=${GH_DB_PATH}&per_page=1`;
+    const res = await fetch(apiUrl, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data[0] && data[0].commit && data[0].commit.committer) {
+      const iso = data[0].commit.committer.date;
+      const d = new Date(iso);
+      const label = d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' })
+                  + ' ' + d.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+      const el = document.getElementById('last-updated');
+      if (el) el.textContent = `Stats last updated: ${label}`;
+    }
+  } catch(_) { /* silently ignore */ }
 }
 
 function loadTableFromDb() {
-  const table = document.getElementById('table-select').value;
-  if (!table || !dbInstance) return;
+  if (!dbInstance) return;
   try {
+    // Get all table names
+    const tableRes = dbInstance.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'");
+    if (!tableRes.length || !tableRes[0].values.length) {
+      showError('No tables found in the database file.');
+      return;
+    }
+    // Auto-use first table
+    const table = tableRes[0].values[0][0];
+
     const res = dbInstance.exec(`SELECT * FROM "${table}"`);
     if (!res.length) { showError('Table is empty.'); return; }
-    headers = res[0].columns;
-    allRows = res[0].values.map(row => {
+    let hdrs = res[0].columns;
+    let rows = res[0].values.map(row => {
       const obj = {};
-      headers.forEach((h, i) => obj[h] = row[i] !== null ? String(row[i]) : '');
+      hdrs.forEach((h, i) => obj[h] = row[i] !== null ? String(row[i]) : '');
       return obj;
     });
 
@@ -733,31 +537,35 @@ function loadTableFromDb() {
       stats_teamwins: 'Team Wins', stats_firstgold: '_drop'
     };
     const keepCols = ['Player', 'Games Played', 'Survival Wins', 'Team Wins', 'Kills', 'PvP Deaths', 'PvE Deaths'];
-    // Remap rows, sum pve1+pve2, keep only wanted columns
-    allRows = allRows.map(row => {
+    rows = rows.map(row => {
       const newRow = {};
       Object.keys(row).forEach(k => { newRow[colMap[k] || k] = row[k]; });
       const a = parseFloat(newRow['_pve_a'] || 0);
       const b = parseFloat(newRow['_pve_b'] || 0);
       newRow['PvE Deaths'] = String(a + b);
-      // Keep only desired columns
       const filtered = {};
       keepCols.forEach(c => { if (newRow[c] !== undefined) filtered[c] = newRow[c]; });
       return filtered;
     });
-    headers = keepCols.filter(c => allRows.some(r => r[c] !== undefined));
+    headers = keepCols.filter(c => rows.some(r => r[c] !== undefined));
+    allRows = rows;
 
     render();
     document.getElementById('setup-panel').style.display = 'none';
     document.getElementById('dashboard').style.display = 'block';
-    setStatus(`Loaded from .db: ${table}`, 'ok');
+    document.getElementById('header-right').style.display = 'flex';
+    setStatus('Loaded', 'ok');
     const _ct = document.getElementById('countdown-text'); if(_ct) _ct.textContent = '';
-    // No auto-refresh for DB files
     clearInterval(refreshInterval);
   } catch(e) {
     showError('Failed to query table: ' + e.message);
   }
 }
+
+// ── AUTO-LOAD ─────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  loadDbFromGitHub();
+});
 
 // ── DARK MODE ─────────────────────────────────────────────────────────────────
 function toggleTheme() {
