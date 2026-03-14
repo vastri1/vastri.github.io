@@ -55,6 +55,18 @@ header {
 .logo-icon { font-size: 18px; }
 .logo-text { font-size: 1.1rem; font-weight: bold; letter-spacing: -0.3px; }
 .logo-text span { color: var(--muted); font-weight: normal; }
+.logo-season {
+  font-size: 11px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 0.15rem 0.5rem;
+  border-radius: 3px;
+  margin-left: 0.25rem;
+  white-space: nowrap;
+}
 
 .header-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-left: auto; }
 .header-left { display: flex; align-items: center; gap: 0.5rem; }
@@ -88,6 +100,87 @@ header {
 .btn:active { opacity: 0.7; }
 .btn-ghost { background: var(--bg); color: var(--muted); border-color: var(--border); }
 .btn-ghost:hover { background: #111; color: #fff; border-color: #111; }
+
+/* SEASONS DROPDOWN */
+.seasons-wrapper {
+  position: relative;
+}
+.seasons-btn {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--bg);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.seasons-btn:hover { background: #111; color: #fff; border-color: #111; }
+.seasons-btn .chevron {
+  font-size: 10px;
+  transition: transform 0.15s;
+  display: inline-block;
+}
+.seasons-btn.open .chevron { transform: rotate(180deg); }
+.seasons-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 160px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  z-index: 100;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+}
+.seasons-dropdown.open { display: block; }
+.seasons-dropdown-header {
+  padding: 0.5rem 0.85rem;
+  font-size: 10px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.season-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.55rem 0.85rem;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.12s;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+.season-item:hover { background: var(--border); }
+.season-item.current {
+  color: var(--muted);
+  cursor: default;
+  pointer-events: none;
+}
+.season-item.current:hover { background: transparent; }
+.season-badge {
+  font-size: 10px;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.season-badge.active {
+  border-color: #444;
+  color: var(--muted);
+}
 
 /* ERROR */
 #error-msg {
@@ -231,9 +324,27 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
     <div class="logo">
       <img src="https://mc-heads.net/avatar/DavidBry/30" style="width:30px;height:30px;border-radius:4px;flex-shrink:0;image-rendering:pixelated;" alt="MinionUHC" />
       <div class="logo-text">Minion<span>UHC</span></div>
+      <div class="logo-season">Season 1</div>
     </div>
     <div class="header-right" id="header-right" style="display:flex">
-<button class="btn btn-ghost" id="theme-toggle" onclick="toggleTheme()">☀ Light</button>
+
+      <!-- Seasons dropdown -->
+      <div class="seasons-wrapper" id="seasons-wrapper">
+        <button class="seasons-btn" id="seasons-btn" onclick="toggleSeasons()">
+          Previous Seasons <span class="chevron">▾</span>
+        </button>
+        <div class="seasons-dropdown" id="seasons-dropdown">
+          <div class="seasons-dropdown-header">Previous Seasons</div>
+          <div class="season-item current">
+            Season 1 <span class="season-badge active">Current</span>
+          </div>
+          <a class="season-item" href="#">Season 2 <span class="season-badge">View</span></a>
+          <a class="season-item" href="#">Season 3 <span class="season-badge">View</span></a>
+          <a class="season-item" href="#">Season 4 <span class="season-badge">View</span></a>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost" id="theme-toggle" onclick="toggleTheme()">☀ Light</button>
       <div class="social-links">
         <a class="social-btn" href="https://twitch.tv/ehmickae" target="_blank" rel="noopener" title="Twitch">
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>
@@ -588,6 +699,29 @@ function toggleTheme() {
     }
   });
 })();
+
+// ── SEASONS DROPDOWN ──────────────────────────────────────────────────────────
+function toggleSeasons() {
+  const btn = document.getElementById('seasons-btn');
+  const dropdown = document.getElementById('seasons-dropdown');
+  const isOpen = dropdown.classList.contains('open');
+  if (isOpen) {
+    dropdown.classList.remove('open');
+    btn.classList.remove('open');
+  } else {
+    dropdown.classList.add('open');
+    btn.classList.add('open');
+  }
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+  const wrapper = document.getElementById('seasons-wrapper');
+  if (wrapper && !wrapper.contains(e.target)) {
+    document.getElementById('seasons-dropdown').classList.remove('open');
+    document.getElementById('seasons-btn').classList.remove('open');
+  }
+});
 </script>
 </body>
 </html>
