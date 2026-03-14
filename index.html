@@ -497,8 +497,7 @@ async function fetchLastUpdated() {
     if (data && data[0] && data[0].commit && data[0].commit.committer) {
       const iso = data[0].commit.committer.date;
       const d = new Date(iso);
-      const label = d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' })
-                  + ' ' + d.toLocaleTimeString(undefined, { hour:'2-digit', minute:'2-digit' });
+      const label = d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
       const el = document.getElementById('last-updated');
       if (el) el.textContent = `Stats last updated: ${label}`;
     }
@@ -555,10 +554,8 @@ function loadTableFromDb() {
     document.getElementById('dashboard').style.display = 'block';
     document.getElementById('header-right').style.display = 'flex';
     setStatus('Loaded', 'ok');
-    const _ct = document.getElementById('countdown-text'); if(_ct) _ct.textContent = '';
-    clearInterval(refreshInterval);
   } catch(e) {
-    showError('Failed to query table: ' + e.message);
+    // silently ignore query errors
   }
 }
 
