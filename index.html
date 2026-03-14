@@ -316,21 +316,20 @@ function render() {
   applySort();
 }
 
-
 // CARDS
 function renderCards() {
   const playerCol = textCol();
-
+ 
   // Card 1: Most Survival Wins
   const swVals = allRows.map(r => toNum(r['Survival Wins']));
   const swMax = Math.max(...swVals);
   const swTop = allRows[swVals.indexOf(swMax)]?.[playerCol] || '?';
-
+ 
   // Card 2: Top Kills
   const kVals = allRows.map(r => toNum(r['Kills']));
   const kMax = Math.max(...kVals);
   const kTop = allRows[kVals.indexOf(kMax)]?.[playerCol] || '?';
-
+ 
   // Card 3: Best K.D.A. (Kills / max(1, PvE Deaths + AFK Deaths))
   const kdaVals = allRows.map(r => {
     const k = toNum(r['Kills']);
@@ -339,36 +338,40 @@ function renderCards() {
   });
   const kdaMax = Math.max(...kdaVals);
   const kdaTop = allRows[kdaVals.indexOf(kdaMax)]?.[playerCol] || '?';
-
+ 
   // Card 4: Total Players
   const total = allRows.length;
-
+ 
   const html = `
     <div class="card">
       <div class="card-label">Most Survival Wins</div>
       <div class="card-value">${swMax.toLocaleString()}</div>
-      <div class="card-sub">${swTop}</div>
+      <div class="card-sub" style="display:flex;align-items:center;gap:0.35rem;">
+        <img src="https://mc-heads.net/avatar/${encodeURIComponent(swTop)}/16" style="width:16px;height:16px;border-radius:2px;image-rendering:pixelated;flex-shrink:0;" onerror="this.style.display='none'" />${swTop}
+      </div>
     </div>
     <div class="card">
       <div class="card-label">Top Kills</div>
       <div class="card-value">${kMax.toLocaleString()}</div>
-      <div class="card-sub">${kTop}</div>
+      <div class="card-sub" style="display:flex;align-items:center;gap:0.35rem;">
+        <img src="https://mc-heads.net/avatar/${encodeURIComponent(kTop)}/16" style="width:16px;height:16px;border-radius:2px;image-rendering:pixelated;flex-shrink:0;" onerror="this.style.display='none'" />${kTop}
+      </div>
     </div>
     <div class="card">
       <div class="card-label">Best K/D</div>
       <div class="card-value">${kdaMax.toFixed(2)}</div>
-      <div class="card-sub">${kdaTop}</div>
+      <div class="card-sub" style="display:flex;align-items:center;gap:0.35rem;">
+        <img src="https://mc-heads.net/avatar/${encodeURIComponent(kdaTop)}/16" style="width:16px;height:16px;border-radius:2px;image-rendering:pixelated;flex-shrink:0;" onerror="this.style.display='none'" />${kdaTop}
+      </div>
     </div>
     <div class="card">
       <div class="card-label">Total Players</div>
       <div class="card-value">${total}</div>
       <div class="card-sub">who have minioned</div>
     </div>`;
-
+ 
   document.getElementById('cards').innerHTML = html;
 }
-
-
 
 // TABLE HEAD
 function renderThead() {
