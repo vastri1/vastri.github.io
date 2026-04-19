@@ -477,20 +477,20 @@ function renderTbody(data) {
   const seenKeys = new Map(); // statKey → assigned rank
   let nextRank = 1;
   for (const row of data) {
-    if (hasNoStats(row)) { rankMap.set(row, null); continue; }
+    if (hasNoStats(row)) continue;
     const key = statKey(row);
-    if (!seenKeys.has(key)) {
-      seenKeys.set(key, nextRank++);
-    }
+    if (!seenKeys.has(key)) seenKeys.set(key, nextRank++);
     rankMap.set(row, seenKeys.get(key));
+  }
+  // No-stat players get sequential numbers continuing after ranked players
+  for (const row of data) {
+    if (hasNoStats(row)) rankMap.set(row, nextRank++);
   }
 
   document.getElementById('tbody').innerHTML = filtered.map((row) => {
     const rank = rankMap.get(row);
     let rankCell;
-    if (rank === null) {
-      rankCell = `<span style="color:var(--muted)">—</span>`;
-    } else if (rank <= 3) {
+    if (rank <= 3) {
       rankCell = `<span class="medal">${MEDALS[rank - 1]}</span>`;
     } else {
       rankCell = `<span style="color:var(--muted)">${rank}</span>`;
