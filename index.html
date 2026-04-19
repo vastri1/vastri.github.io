@@ -411,13 +411,11 @@ function setSort(col) {
 }
 
 function hasNoStats(row) {
-  // A player has "no stats" if every numeric column is 0 (or missing)
   return numCols().every(h => toNum(row[h]) === 0);
 }
 
 function applySort() {
-  const numericCols = numCols();
-  // Separate zero-stat players; shuffle them so they appear in random order
+  // Split out zero-stat players; shuffle them randomly to the bottom
   const withStats = allRows.filter(r => !hasNoStats(r));
   const noStats   = allRows.filter(r =>  hasNoStats(r)).sort(() => Math.random() - 0.5);
 
@@ -425,8 +423,16 @@ function applySort() {
     withStats.sort((a, b) => {
       const av = a[sortCol]||'', bv = b[sortCol]||'';
       const an = parseFloat(String(av).replace(/,/g,'')), bn = parseFloat(String(bv).replace(/,/g,''));
-      if (!isNaN(an) && !isNaN(bn)) return sortAsc ? an-bn : bn-an;
-      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      // Primary sort on selected column
+      let cmp;
+      if (!isNaN(an) && !isNaN(bn)) cmp = sortAsc ? an-bn : bn-an;
+      else cmp = sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      if (cmp !== 0) return cmp;
+      // Tiebreaker 1: most Team Wins
+      const tw = toNum(b['Team Wins']) - toNum(a['Team Wins']);
+      if (tw !== 0) return tw;
+      // Tiebreaker 2: most Kills
+      return toNum(b['Kills']) - toNum(a['Kills']);
     });
   }
 
@@ -456,17 +462,20 @@ function renderTbody(data) {
 
   const MEDALS = ['🥇','🥈','🥉'];
 
-  // Build a dense-rank map: tied players share the same rank, next rank is +1 (not skipped)
-  // Zero-stat players get rank null (shown as —)
+  // Build dense-rank map: tied players (same primary-column value) share a rank;
+  // next distinct value increments by 1 (not by the size of the tied group).
+  // Zero-stat players get rank null → shown as —
   const rankMap = new Map();
   let denseRank = 0;
   for (let i = 0; i < data.length; i++) {
     const row = data[i];
     if (hasNoStats(row)) { rankMap.set(row, null); continue; }
-    if (i === 0 || hasNoStats(data[i-1])) {
-      denseRank++;
+    // Find the previous non-zero-stat row to compare against
+    const prevRanked = data.slice(0, i).reverse().find(r => !hasNoStats(r));
+    if (!prevRanked) {
+      denseRank = 1;
     } else {
-      const prev = data[i-1][sortCol]||'', cur = row[sortCol]||'';
+      const prev = prevRanked[sortCol]||'', cur = row[sortCol]||'';
       const pn = parseFloat(String(prev).replace(/,/g,'')), cn = parseFloat(String(cur).replace(/,/g,''));
       const tied = !isNaN(pn) && !isNaN(cn) ? pn === cn : prev === cur;
       if (!tied) denseRank++;
