@@ -416,8 +416,16 @@ function applySort() {
     data.sort((a, b) => {
       const av = a[sortCol]||'', bv = b[sortCol]||'';
       const an = parseFloat(String(av).replace(/,/g,'')), bn = parseFloat(String(bv).replace(/,/g,''));
-      if (!isNaN(an) && !isNaN(bn)) return sortAsc ? an-bn : bn-an;
-      return sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      // Primary sort
+      let cmp;
+      if (!isNaN(an) && !isNaN(bn)) cmp = sortAsc ? an-bn : bn-an;
+      else cmp = sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
+      if (cmp !== 0) return cmp;
+      // Tiebreaker 1: Team Wins descending
+      const atw = toNum(a['Team Wins']), btw = toNum(b['Team Wins']);
+      if (btw !== atw) return btw - atw;
+      // Tiebreaker 2: Kills descending
+      return toNum(b['Kills']) - toNum(a['Kills']);
     });
   }
   renderTbody(data);
@@ -446,13 +454,34 @@ function renderTbody(data) {
 
   const MEDALS = ['🥇','🥈','🥉'];
 
-  // Use global sorted order to determine rank, filter is just a visual subset
-  const sortedAll = data; // data is already sorted by applySort
+  // Build a competition-rank map for the full sorted data
+  // Rank is based on the primary sort column value; ties share the same rank
+  // (1,1,3 style — standard competition ranking)
+  const rankMap = new Map();
+  if (sortCol && sortCol !== '#') {
+    let rank = 1;
+    for (let i = 0; i < data.length; i++) {
+      if (i === 0) {
+        rankMap.set(data[i], rank);
+      } else {
+        const prev = data[i-1][sortCol]||'';
+        const cur  = data[i][sortCol]||'';
+        const pn = parseFloat(String(prev).replace(/,/g,''));
+        const cn = parseFloat(String(cur).replace(/,/g,''));
+        const tied = !isNaN(pn) && !isNaN(cn) ? pn === cn : prev === cur;
+        if (!tied) rank = i + 1; // skip ranks for the tied block
+        rankMap.set(data[i], rank);
+      }
+    }
+  } else {
+    data.forEach((row, i) => rankMap.set(row, i + 1));
+  }
+
   document.getElementById('tbody').innerHTML = filtered.map((row) => {
-    const rank = sortedAll.indexOf(row);
-    const rankCell = rank < 3
-      ? `<span class="medal">${MEDALS[rank]}</span>`
-      : `<span style="color:var(--muted)">${rank+1}</span>`;
+    const rank = rankMap.get(row) ?? (data.indexOf(row) + 1);
+    const rankCell = rank <= 3
+      ? `<span class="medal">${MEDALS[rank-1]}</span>`
+      : `<span style="color:var(--muted)">${rank}</span>`;
     const cells = headers.map(h => {
       if (isNum(h)) return `<td class="td-num">${Number(row[h]).toLocaleString()}</td>`;
       const playerName = row[h] || '—';
