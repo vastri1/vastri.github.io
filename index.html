@@ -410,12 +410,20 @@ function setSort(col) {
   updateSortIcons();
 }
 
+// Returns true if a player has zero Survival Wins, Team Wins, AND Kills
 function hasNoStats(row) {
-  return numCols().every(h => toNum(row[h]) === 0);
+  return toNum(row['Survival Wins']) === 0
+      && toNum(row['Team Wins'])     === 0
+      && toNum(row['Kills'])         === 0;
+}
+
+// Returns a string key of the three ranking stats for true-tie detection
+function statKey(row) {
+  return `${toNum(row['Survival Wins'])}_${toNum(row['Team Wins'])}_${toNum(row['Kills'])}`;
 }
 
 function applySort() {
-  // Split out zero-stat players; shuffle them randomly to the bottom
+  // Players with no stats go to the bottom in random order
   const withStats = allRows.filter(r => !hasNoStats(r));
   const noStats   = allRows.filter(r =>  hasNoStats(r)).sort(() => Math.random() - 0.5);
 
@@ -423,9 +431,9 @@ function applySort() {
     withStats.sort((a, b) => {
       const av = a[sortCol]||'', bv = b[sortCol]||'';
       const an = parseFloat(String(av).replace(/,/g,'')), bn = parseFloat(String(bv).replace(/,/g,''));
-      // Primary sort on selected column
+      // Primary column
       let cmp;
-      if (!isNaN(an) && !isNaN(bn)) cmp = sortAsc ? an-bn : bn-an;
+      if (!isNaN(an) && !isNaN(bn)) cmp = sortAsc ? an - bn : bn - an;
       else cmp = sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
       if (cmp !== 0) return cmp;
       // Tiebreaker 1: most Team Wins
@@ -462,25 +470,19 @@ function renderTbody(data) {
 
   const MEDALS = ['🥇','🥈','🥉'];
 
-  // Build dense-rank map: tied players (same primary-column value) share a rank;
-  // next distinct value increments by 1 (not by the size of the tied group).
-  // Zero-stat players get rank null → shown as —
+  // Dense ranking: two players share a rank only when their Survival Wins,
+  // Team Wins, AND Kills are all identical. Each new unique combo increments
+  // the rank by 1 (never skips numbers). No-stat players get rank null (→ —).
   const rankMap = new Map();
-  let denseRank = 0;
-  for (let i = 0; i < data.length; i++) {
-    const row = data[i];
+  const seenKeys = new Map(); // statKey → assigned rank
+  let nextRank = 1;
+  for (const row of data) {
     if (hasNoStats(row)) { rankMap.set(row, null); continue; }
-    // Find the previous non-zero-stat row to compare against
-    const prevRanked = data.slice(0, i).reverse().find(r => !hasNoStats(r));
-    if (!prevRanked) {
-      denseRank = 1;
-    } else {
-      const prev = prevRanked[sortCol]||'', cur = row[sortCol]||'';
-      const pn = parseFloat(String(prev).replace(/,/g,'')), cn = parseFloat(String(cur).replace(/,/g,''));
-      const tied = !isNaN(pn) && !isNaN(cn) ? pn === cn : prev === cur;
-      if (!tied) denseRank++;
+    const key = statKey(row);
+    if (!seenKeys.has(key)) {
+      seenKeys.set(key, nextRank++);
     }
-    rankMap.set(row, denseRank);
+    rankMap.set(row, seenKeys.get(key));
   }
 
   document.getElementById('tbody').innerHTML = filtered.map((row) => {
@@ -489,7 +491,7 @@ function renderTbody(data) {
     if (rank === null) {
       rankCell = `<span style="color:var(--muted)">—</span>`;
     } else if (rank <= 3) {
-      rankCell = `<span class="medal">${MEDALS[rank-1]}</span>`;
+      rankCell = `<span class="medal">${MEDALS[rank - 1]}</span>`;
     } else {
       rankCell = `<span style="color:var(--muted)">${rank}</span>`;
     }
