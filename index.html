@@ -352,10 +352,10 @@ function renderCards() {
   const kMax = Math.max(...kVals);
   const kTop = allRows[kVals.indexOf(kMax)]?.[playerCol] || '?';
  
-  // Card 3: Best K.D.A. (Kills / max(1, PvE Deaths + AFK Deaths))
+  // Card 3: Best K/D (Kills / (PvP Deaths + PvE Deaths))
   const kdaVals = allRows.map(r => {
     const k = toNum(r['Kills']);
-    const d = toNum(r['PvE Deaths']) + toNum(r['AFK Deaths']);
+    const d = toNum(r['PvP Deaths']) + toNum(r['PvE Deaths']);
     return d > 0 ? k / d : k;
   });
   const kdaMax = Math.max(...kdaVals);
@@ -410,9 +410,16 @@ function setSort(col) {
   updateSortIcons();
 }
 
+// Returns true if a player has never played a game
+function hasNoGames(row) {
+  return toNum(row['Games Played']) === 0;
+}
+
 // Returns true if a player has zero Survival Wins, Team Wins, AND Kills
+// (but has at least played a game — these get a number, not a dash)
 function hasNoStats(row) {
-  return toNum(row['Survival Wins']) === 0
+  return !hasNoGames(row)
+      && toNum(row['Survival Wins']) === 0
       && toNum(row['Team Wins'])     === 0
       && toNum(row['Kills'])         === 0;
 }
@@ -423,9 +430,11 @@ function statKey(row) {
 }
 
 function applySort() {
-  // Players with no stats go to the bottom in random order
-  const withStats = allRows.filter(r => !hasNoStats(r));
+  // Players with 0 games played go to the very bottom (shown with —), shuffled
+  // Players with games but no stats go just above them, shuffled, with a number
+  const withStats = allRows.filter(r => !hasNoStats(r) && !hasNoGames(r));
   const noStats   = allRows.filter(r =>  hasNoStats(r)).sort(() => Math.random() - 0.5);
+  const noGames   = allRows.filter(r =>  hasNoGames(r)).sort(() => Math.random() - 0.5);
 
   if (sortCol && sortCol !== '#') {
     withStats.sort((a, b) => {
@@ -444,7 +453,7 @@ function applySort() {
     });
   }
 
-  renderTbody([...withStats, ...noStats]);
+  renderTbody([...withStats, ...noStats, ...noGames]);
 }
 
 function updateSortIcons() {
@@ -477,20 +486,26 @@ function renderTbody(data) {
   const seenKeys = new Map(); // statKey → assigned rank
   let nextRank = 1;
   for (const row of data) {
-    if (hasNoStats(row)) continue;
+    if (hasNoStats(row) || hasNoGames(row)) continue;
     const key = statKey(row);
     if (!seenKeys.has(key)) seenKeys.set(key, nextRank++);
     rankMap.set(row, seenKeys.get(key));
   }
-  // No-stat players get sequential numbers continuing after ranked players
+  // No-stat (but played) players get sequential numbers after ranked players
   for (const row of data) {
     if (hasNoStats(row)) rankMap.set(row, nextRank++);
+  }
+  // No-games players get null → shown as —
+  for (const row of data) {
+    if (hasNoGames(row)) rankMap.set(row, null);
   }
 
   document.getElementById('tbody').innerHTML = filtered.map((row) => {
     const rank = rankMap.get(row);
     let rankCell;
-    if (rank <= 3) {
+    if (rank === null) {
+      rankCell = `<span style="color:var(--muted)">—</span>`;
+    } else if (rank <= 3) {
       rankCell = `<span class="medal">${MEDALS[rank - 1]}</span>`;
     } else {
       rankCell = `<span style="color:var(--muted)">${rank}</span>`;
