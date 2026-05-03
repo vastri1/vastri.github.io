@@ -243,6 +243,35 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
 }
 .social-btn:hover { border-color: var(--text); color: var(--text); background: var(--bg); }
 .social-btn svg { width: 16px; height: 16px; fill: currentColor; }
+
+/* PLACEMENTS DROPDOWN */
+.placement-wrap { position: relative; }
+.placement-dropdown {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 300px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 1rem 1.1rem;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.6;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+}
+.placement-dropdown.open { display: block; }
+.placement-dropdown p { margin-bottom: 0.65rem; }
+.placement-dropdown p:last-child { margin-bottom: 0; }
+.placement-note {
+  font-size: 12px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 0.65rem;
+  margin-top: 0.65rem;
+}
 </style>
 </head>
 <body>
@@ -255,6 +284,13 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
       <div class="logo-season">Season 1</div>
     </div>
     <div class="header-right" id="header-right" style="display:flex">
+      <div class="placement-wrap">
+        <button class="btn btn-ghost" id="placement-btn" onclick="togglePlacement(event)">How do placements work?</button>
+        <div class="placement-dropdown" id="placement-dropdown">
+          <p>Placements are ranked by survival wins. If two players have the same amount of survival wins, the individual with more team wins takes priority in placements.</p>
+          <p class="placement-note">Games Played and Deaths do <strong>NOT</strong> factor into your placement on the leaderboard.</p>
+        </div>
+      </div>
       <button class="btn btn-ghost" id="theme-toggle" onclick="toggleTheme()">☀ Light</button>
       <div class="social-links">
         <a class="social-btn" href="https://www.twitch.tv/minionuhc" target="_blank" rel="noopener" title="Twitch">
@@ -643,6 +679,18 @@ function loadTableFromDb() {
 // ── AUTO-LOAD ─────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   loadDbFromGitHub();
+});
+
+// ── PLACEMENTS DROPDOWN ───────────────────────────────────────────────────────
+function togglePlacement(e) {
+  e.stopPropagation();
+  document.getElementById('placement-dropdown').classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  const wrap = document.querySelector('.placement-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('placement-dropdown').classList.remove('open');
+  }
 });
 
 // ── DARK MODE ─────────────────────────────────────────────────────────────────
