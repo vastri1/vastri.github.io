@@ -10,10 +10,11 @@ jobs:
       - uses: actions/checkout@v3
 
       - name: Download stats.db via FTP
-        run: |
-          curl --ftp-ssl -u "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASS }}" \
-          "ftp://${{ secrets.FTP_HOST }}/default/config/minion/stats.db" \
-          -o stats.db
+  run: |
+    curl --ftp-ssl --disable-epsv \
+    -u "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASS }}" \
+    "ftp://${{ secrets.FTP_HOST }}:${{ secrets.FTP_PORT }}/default/config/minion/stats.db" \
+    -o stats.db
 
       - name: Commit and push
         run: |
