@@ -7,14 +7,14 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
-    - name: Download stats.db via FTP
-      run: |
-      curl --disable-epsv \
-      -u "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASS }}" \
-      "ftp://${{ secrets.FTP_HOST }}:${{ secrets.FTP_PORT }}/default/config/minion/stats.db" \
-      -o stats.db
+      - name: Download stats.db via FTP
+        run: |
+          curl --disable-epsv \
+          -u "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASS }}" \
+          "ftp://${{ secrets.FTP_HOST }}:${{ secrets.FTP_PORT }}/default/config/minion/stats.db" \
+          -o stats.db
 
       - name: Commit and push
         run: |
