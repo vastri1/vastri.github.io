@@ -12,7 +12,7 @@ jobs:
       - name: Download stats.db via FTP
         run: |
           curl --ftp-ssl -u "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASS }}" \
-          "ftp://${{ secrets.FTP_HOST }}/path/to/plugins/MinionStats/stats.db" \
+          "ftp://${{ secrets.FTP_HOST }}/default/config/minion/stats.db" \
           -o stats.db
 
       - name: Commit and push
