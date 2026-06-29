@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Image Creator</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --font: Arial, Helvetica, sans-serif;
+  --font-display: Impact, Haettenschweiler, 'Franklin Gothic Bold', 'Arial Narrow', sans-serif;
+  --bg:      #141414;
+  --surface: #1e1e1e;
+  --border:  #2e2e2e;
+  --text:    #e8e8e8;
+  --muted:   #888888;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#app { max-width: 640px; margin: 0 auto; padding: 0 1.5rem 4rem; }
+
+/* HEADER */
+header {
+  display: flex;
+  align-items: center;
+  padding: 1.5rem 0 1rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+.logo { display: flex; align-items: center; gap: 0.5rem; }
+.logo-text { font-size: 1.1rem; font-weight: bold; letter-spacing: -0.3px; }
+.logo-text span { color: var(--muted); font-weight: normal; }
+
+/* BUTTONS */
+.btn {
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid #1a1a1a;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--bg);
+  color: #1a1a1a;
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+.btn:hover { background: #111; color: #fff; }
+.btn-primary { background: #111; color: #fff; }
+.btn-primary:hover { background: #444; }
+.btn:active { opacity: 0.7; }
+.btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
+
+/* ERROR */
+#error-msg {
+  display: none;
+  border: 1px solid #111;
+  padding: 0.75rem 1rem;
+  font-size: 13px;
+  color: #111;
+  margin-bottom: 1.5rem;
+  background: var(--surface);
+}
+
+/* SECTION */
+.section { border: 1px solid var(--border); border-radius: 6px; margin-bottom: 1.5rem; overflow: hidden; }
+.section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; gap: 0.5rem;
+}
+.section-title { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+.section-body { padding: 1.25rem; }
+
+/* FIELDS */
+.field-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 0.5rem; }
+.text-input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  padding: 0.6rem 0.8rem;
+  outline: none;
+}
+.text-input:focus { border-color: #111; }
+.text-input::placeholder { color: var(--muted); }
+
+/* DROPZONE */
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 6px;
+  padding: 2.25rem 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  background: var(--bg);
+  transition: border-color 0.15s, background 0.15s;
+}
+.dropzone:hover { border-color: var(--muted); }
+.dropzone.dragover { border-color: var(--text); background: var(--surface); }
+.dropzone-icon { font-size: 1.8rem; margin-bottom: 0.5rem; color: var(--muted); }
+.dropzone-text { font-weight: bold; margin-bottom: 0.15rem; word-break: break-all; }
+.dropzone-sub { font-size: 12px; color: var(--muted); }
+
+/* PREVIEW */
+#preview-card { width: 100%; }
+#caption {
+  font-family: var(--font-display);
+  font-size: clamp(1.3rem, 6vw, 2rem);
+  text-align: center;
+  line-height: 1.15;
+  margin-bottom: 0.75rem;
+  word-break: break-word;
+  background: #fff;
+  color: #000;
+  padding: 0.85rem 1rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+#image-wrap {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 13px;
+  overflow: hidden;
+}
+#image-wrap.has-image { display: block; min-height: 0; }
+#preview-img { width: 100%; display: block; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <header>
+    <div class="logo">
+      <img src="https://mc-heads.net/avatar/DavidBry/30" style="width:30px;height:30px;border-radius:4px;flex-shrink:0;image-rendering:pixelated;" alt="MinionUHC" />
+      <div class="logo-text">Minion<span>UHC</span></div>
+    </div>
+  </header>
+
+  <!-- ERROR -->
+  <div id="error-msg"></div>
+
+  <!-- STEP 1: NAME -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Name</div>
+    </div>
+    <div class="section-body">
+      <label class="field-label" for="name-input">Player Name</label>
+      <input class="text-input" id="name-input" type="text" placeholder="e.g. GlxyLuke" maxlength="60" oninput="updateCaption()" />
+    </div>
+  </div>
+
+  <!-- STEP 2: IMAGE -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Upload Image</div>
+    </div>
+    <div class="section-body">
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()">
+        <div id="dropzone-empty">
+          <div class="dropzone-icon">⬆</div>
+          <div class="dropzone-text">Drag &amp; drop an image here</div>
+          <div class="dropzone-sub">or click to browse</div>
+        </div>
+        <div id="dropzone-filled" style="display:none;">
+          <div class="dropzone-icon">✓</div>
+          <div class="dropzone-text" id="filename-text"></div>
+          <div class="dropzone-sub">Click or drop to replace</div>
+        </div>
+      </div>
+      <input type="file" id="file-input" accept="image/*" hidden onchange="handleFiles(this.files)" />
+    </div>
+  </div>
+
+  <!-- PREVIEW -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-title">Preview</div>
+      <button class="btn btn-primary" id="download-btn" onclick="downloadImage()" disabled>⬇ Download</button>
+    </div>
+    <div class="section-body">
+      <div id="preview-card">
+        <div id="caption">Type a name to make them show up on August 18th</div>
+        <div id="image-wrap">
+          <span id="placeholder-text">Your image will appear here</span>
+          <img id="preview-img" style="display:none;" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── ERROR ────────────────────────────────────────────────────────────────────
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg;
+  el.style.display = msg ? 'block' : 'none';
+}
+
+// ── CAPTION ──────────────────────────────────────────────────────────────────
+function captionText() {
+  const name = document.getElementById('name-input').value.trim();
+  return (name ? name + ' ' : '') + 'will be there on August 18th. will you?';
+}
+
+function updateCaption() {
+  const name = document.getElementById('name-input').value.trim();
+  document.getElementById('caption').textContent = name
+    ? captionText()
+    : 'Type a name above to see your caption';
+}
+
+// ── UPLOAD ───────────────────────────────────────────────────────────────────
+const dropzone = document.getElementById('dropzone');
+
+['dragenter', 'dragover'].forEach(evt =>
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.add('dragover'); })
+);
+['dragleave', 'drop'].forEach(evt =>
+  dropzone.addEventListener(evt, e => { e.preventDefault(); dropzone.classList.remove('dragover'); })
+);
+dropzone.addEventListener('drop', e => {
+  if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
+});
+
+function handleFiles(files) {
+  const file = files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    showError('Please upload an image file (PNG, JPG, GIF, etc).');
+    return;
+  }
+  showError('');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('preview-img');
+    img.onload = () => { document.getElementById('download-btn').disabled = false; };
+    img.src = e.target.result;
+    img.style.display = 'block';
+
+    document.getElementById('image-wrap').classList.add('has-image');
+    document.getElementById('placeholder-text').style.display = 'none';
+    document.getElementById('dropzone-empty').style.display = 'none';
+    document.getElementById('dropzone-filled').style.display = 'block';
+    document.getElementById('filename-text').textContent = file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── TEXT WRAPPING (for laying out the caption on the composite canvas) ───────
+function wrapLines(text, font, maxWidth) {
+  const measureCtx = document.createElement('canvas').getContext('2d');
+  measureCtx.font = font;
+  const words = text.split(' ');
+  const lines = [];
+  let line = '';
+  words.forEach(word => {
+    const test = line ? line + ' ' + word : word;
+    if (measureCtx.measureText(test).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+    } else {
+      line = test;
+    }
+  });
+  if (line) lines.push(line);
+  return lines;
+}
+
+// ── GIF ENCODER ────────────────────────────────────────────────────────────
+// Minimal self-contained GIF89a writer: builds a fixed 256-color palette
+// (216-color cube + grayscale ramp), quantizes pixels to it, and LZW-compresses
+// the indexed data per the GIF spec. No external libraries needed.
+const GIF_LEVELS = [0, 51, 102, 153, 204, 255];
+
+function buildGifPalette() {
+  const pal = [];
+  for (const r of GIF_LEVELS) {
+    for (const g of GIF_LEVELS) {
+      for (const b of GIF_LEVELS) {
+        pal.push([r, g, b]);
+      }
+    }
+  }
+  for (let i = 0; i < 40; i++) {
+    const v = Math.round((i * 255) / 39);
+    pal.push([v, v, v]);
+  }
+  return pal; // 256 entries
+}
+
+function nearestPaletteIndex(pal, r, g, b) {
+  let bestI = 0, bestD = Infinity;
+  for (let i = 0; i < pal.length; i++) {
+    const p = pal[i];
+    const dr = p[0] - r, dg = p[1] - g, db = p[2] - b;
+    const d = dr * dr + dg * dg + db * db;
+    if (d < bestD) { bestD = d; bestI = i; }
+  }
+  return bestI;
+}
+
+function quantizeToPalette(rgbaData, pal) {
+  const numPixels = rgbaData.length / 4;
+  const indices = new Uint8Array(numPixels);
+  for (let i = 0; i < numPixels; i++) {
+    const o = i * 4;
+    indices[i] = nearestPaletteIndex(pal, rgbaData[o], rgbaData[o + 1], rgbaData[o + 2]);
+  }
+  return indices;
+}
+
+function gifLzwEncode(indices, minCodeSize) {
+  const clearCode = 1 << minCodeSize;
+  const eoiCode = clearCode + 1;
+
+  let dict, nextCode, codeSize;
+  function resetDict() {
+    dict = new Map();
+    for (let i = 0; i < clearCode; i++) dict.set(String(i), i);
+    nextCode = eoiCode + 1;
+    codeSize = minCodeSize + 1;
+  }
+  resetDict();
+
+  const out = [];
+  let bitBuf = 0, bitCnt = 0;
+  function writeCode(code) {
+    bitBuf |= (code << bitCnt);
+    bitCnt += codeSize;
+    while (bitCnt >= 8) {
+      out.push(bitBuf & 0xFF);
+      bitBuf >>>= 8;
+      bitCnt -= 8;
+    }
+  }
+
+  writeCode(clearCode);
+  let w = String(indices[0]);
+  for (let i = 1; i < indices.length; i++) {
+    const k = indices[i];
+    const wk = w + ',' + k;
+    if (dict.has(wk)) {
+      w = wk;
+    } else {
+      writeCode(dict.get(w));
+      if (nextCode < 4096) {
+        dict.set(wk, nextCode);
+        nextCode++;
+        if (nextCode - 1 === (1 << codeSize) && codeSize < 12) codeSize++;
+      } else {
+        writeCode(clearCode);
+        resetDict();
+      }
+      w = String(k);
+    }
+  }
+  writeCode(dict.get(w));
+  writeCode(eoiCode);
+  if (bitCnt > 0) out.push(bitBuf & 0xFF);
+  return out;
+}
+
+function gifSubBlocks(bytes) {
+  const out = [];
+  for (let i = 0; i < bytes.length; i += 255) {
+    const chunk = bytes.slice(i, i + 255);
+    out.push(chunk.length, ...chunk);
+  }
+  out.push(0);
+  return out;
+}
+
+function buildGifFile(width, height, pal, indices) {
+  const bytes = [];
+  const pushStr = s => { for (let i = 0; i < s.length; i++) bytes.push(s.charCodeAt(i)); };
+  const push16 = v => { bytes.push(v & 0xFF, (v >> 8) & 0xFF); };
+
+  pushStr('GIF89a');
+  push16(width);
+  push16(height);
+  bytes.push(0xF7, 0, 0); // packed (global color table, 256 colors), bg index, pixel aspect
+
+  for (const [r, g, b] of pal) bytes.push(r, g, b);
+
+  bytes.push(0x2C); // image separator
+  push16(0); push16(0); push16(width); push16(height);
+  bytes.push(0x00); // no local color table / interlace
+
+  const minCodeSize = 8;
+  bytes.push(minCodeSize);
+  const compressed = gifLzwEncode(indices, minCodeSize);
+  const blocked = gifSubBlocks(compressed);
+  for (let i = 0; i < blocked.length; i++) bytes.push(blocked[i]);
+
+  bytes.push(0x3B); // trailer
+  return Uint8Array.from(bytes);
+}
+
+// ── DOWNLOAD (composites caption + image, then encodes a real .gif) ──────────
+function downloadImage() {
+  const img = document.getElementById('preview-img');
+  if (!img.src || !img.naturalWidth) return;
+
+  const btn = document.getElementById('download-btn');
+  btn.disabled = true;
+  btn.textContent = 'Generating .gif…';
+
+  // Let the button label repaint before the (synchronous, CPU-bound) encode runs.
+  setTimeout(() => {
+    try {
+      // GIFs only support 256 colors, so cap the canvas size to keep
+      // quantizing/encoding fast regardless of the source photo's resolution.
+      const MAX_DIM = 640;
+      let scale = 1;
+      if (img.naturalWidth > MAX_DIM || img.naturalHeight > MAX_DIM) {
+        scale = MAX_DIM / Math.max(img.naturalWidth, img.naturalHeight);
+      }
+      const photoW = Math.max(1, Math.round(img.naturalWidth * scale));
+      const photoH = Math.max(1, Math.round(img.naturalHeight * scale));
+
+      const text = captionText();
+      const fontSize = Math.max(20, Math.round(photoW / 13));
+      const font = fontSize + "px Impact, Haettenschweiler, 'Franklin Gothic Bold', 'Arial Narrow', sans-serif";
+      const padding = Math.round(fontSize * 0.55);
+      const lineHeight = Math.round(fontSize * 1.12);
+      const lines = wrapLines(text, font, photoW - padding * 2);
+      const captionHeight = lines.length * lineHeight + padding * 2;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = photoW;
+      canvas.height = photoH + captionHeight;
+      const ctx = canvas.getContext('2d');
+
+      // White caption card, black text
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, captionHeight);
+      ctx.fillStyle = '#000000';
+      ctx.font = font;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      lines.forEach((line, i) => {
+        ctx.fillText(line, canvas.width / 2, padding + i * lineHeight);
+      });
+
+      ctx.drawImage(img, 0, captionHeight, photoW, photoH);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+      const pal = buildGifPalette();
+      const indices = quantizeToPalette(imageData, pal);
+      const gifBytes = buildGifFile(canvas.width, canvas.height, pal, indices);
+
+      const blob = new Blob([gifBytes], { type: 'image/gif' });
+      const url = URL.createObjectURL(blob);
+      const name = document.getElementById('name-input').value.trim().toLowerCase().replace(/\s+/g, '-');
+      const link = document.createElement('a');
+      link.download = (name || 'invite') + '-aug-18.gif';
+      link.href = url;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    } catch (err) {
+      showError('Something went wrong generating the .gif. Please try again.');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '⬇ Download';
+    }
+  }, 0);
+}
+</script>
+</body>
+</html>
