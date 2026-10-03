@@ -5,23 +5,61 @@ on:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+
     permissions:
       contents: write
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      - name: Verify FTP configuration
+        env:
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
+        run: |
+          set -euo pipefail
+
+          test -n "$FTP_USER" || { echo "::error::FTP_USER is missing"; exit 1; }
+          test -n "$FTP_PASS" || { echo "::error::FTP_PASS is missing"; exit 1; }
+          test -n "$FTP_HOST" || { echo "::error::FTP_HOST is missing"; exit 1; }
+          test -n "$FTP_PORT" || { echo "::error::FTP_PORT is missing"; exit 1; }
+
+          echo "FTP secrets are configured."
 
       - name: Download stats.db via FTP
+        env:
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
         run: |
-          curl --disable-epsv \
-          -u "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASS }}" \
-          "ftp://${{ secrets.FTP_HOST }}:${{ secrets.FTP_PORT }}/default/config/minion/stats.db" \
-          -o stats.db
+          curl \
+            --fail \
+            --show-error \
+            --disable-epsv \
+            --user "$FTP_USER:$FTP_PASS" \
+            "ftp://$FTP_HOST:$FTP_PORT/default/config/minion/stats.db" \
+            --output stats.db
+
+          test -s stats.db || {
+            echo "::error::stats.db downloaded but is empty"
+            exit 1
+          }
 
       - name: Commit and push
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
+
           git add stats.db
-          git diff --staged --quiet || git commit -m "auto update stats"
+
+          if git diff --staged --quiet; then
+            echo "stats.db has not changed."
+            exit 0
+          fi
+
+          git commit -m "auto update stats"
           git push
