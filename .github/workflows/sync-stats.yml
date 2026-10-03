@@ -11,63 +11,81 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v7
+      - name: Checkout repository
+        uses: actions/checkout@v7
 
-      - name: Verify SFTP configuration
+      - name: Verify FTP configuration
         env:
-          SFTP_USER: ${{ secrets.FTP_USER }}
-          SFTP_PASS: ${{ secrets.FTP_PASS }}
-          SFTP_HOST: ${{ secrets.FTP_HOST }}
-          SFTP_PORT: ${{ secrets.FTP_PORT }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
         run: |
           set -euo pipefail
 
-          test -n "$SFTP_USER" || { echo "::error::FTP_USER is missing"; exit 1; }
-          test -n "$SFTP_PASS" || { echo "::error::FTP_PASS is missing"; exit 1; }
-          test -n "$SFTP_HOST" || { echo "::error::FTP_HOST is missing"; exit 1; }
-          test -n "$SFTP_PORT" || { echo "::error::FTP_PORT is missing"; exit 1; }
-
-      - name: Install SFTP tools
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y sshpass
-
-      - name: Trust SFTP host
-        env:
-          SFTP_HOST: ${{ secrets.FTP_HOST }}
-          SFTP_PORT: ${{ secrets.FTP_PORT }}
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -p "$SFTP_PORT" "$SFTP_HOST" >> ~/.ssh/known_hosts
-
-      - name: Download stats.db via SFTP
-        env:
-          SFTP_USER: ${{ secrets.FTP_USER }}
-          SFTP_PASS: ${{ secrets.FTP_PASS }}
-          SFTP_HOST: ${{ secrets.FTP_HOST }}
-          SFTP_PORT: ${{ secrets.FTP_PORT }}
-        run: |
-          sshpass -p "$SFTP_PASS" sftp \
-            -P "$SFTP_PORT" \
-            "$SFTP_USER@$SFTP_HOST" <<EOF
-          get /default/config/minion/stats.db stats.db
-          bye
-          EOF
-
-          test -s stats.db || {
-            echo "::error::stats.db is missing or empty"
+          test -n "$FTP_USER" || {
+            echo "::error::FTP_USER secret is missing"
             exit 1
           }
 
-      - name: Commit and push
+          test -n "$FTP_PASS" || {
+            echo "::error::FTP_PASS secret is missing"
+            exit 1
+          }
+
+          test -n "$FTP_HOST" || {
+            echo "::error::FTP_HOST secret is missing"
+            exit 1
+          }
+
+          test -n "$FTP_PORT" || {
+            echo "::error::FTP_PORT secret is missing"
+            exit 1
+          }
+
+          echo "FTP configuration is present."
+
+      - name: Download stats.db from Apex
+        env:
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASS: ${{ secrets.FTP_PASS }}
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_PORT: ${{ secrets.FTP_PORT }}
         run: |
+          set -euo pipefail
+
+          echo "Downloading stats.db using explicit FTP over TLS..."
+
+          curl \
+            --ssl-reqd \
+            --fail \
+            --show-error \
+            --connect-timeout 20 \
+            --max-time 120 \
+            --retry 2 \
+            --user "$FTP_USER:$FTP_PASS" \
+            "ftp://$FTP_HOST:$FTP_PORT/default/config/minion/stats.db" \
+            --output stats.db
+
+          if [ ! -s stats.db ]; then
+            echo "::error::stats.db was not downloaded or is empty"
+            exit 1
+          fi
+
+          echo "stats.db downloaded successfully."
+          ls -lh stats.db
+
+      - name: Commit and push stats.db
+        run: |
+          set -euo pipefail
+
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
           git add stats.db
 
           if git diff --staged --quiet; then
-            echo "stats.db has not changed."
+            echo "stats.db has not changed. Nothing to commit."
             exit 0
           fi
 
