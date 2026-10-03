@@ -45,6 +45,11 @@ jobs:
 
           echo "FTP configuration is present."
 
+      - name: Install lftp
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
       - name: Download stats.db from Apex
         env:
           FTP_USER: ${{ secrets.FTP_USER }}
@@ -56,19 +61,23 @@ jobs:
 
           echo "Downloading stats.db using explicit FTP over TLS..."
 
-          curl \
-            --ssl-reqd \
-            --disable-epsv \
-            --ftp-pasv \
-            --ftp-skip-pasv-ip \
-            --fail \
-            --show-error \
-            --connect-timeout 20 \
-            --max-time 120 \
-            --retry 2 \
-            --user "$FTP_USER:$FTP_PASS" \
-            "ftp://$FTP_HOST:$FTP_PORT/default/config/minion/stats.db" \
-            --output stats.db
+          lftp \
+            -u "$FTP_USER","$FTP_PASS" \
+            -p "$FTP_PORT" \
+            "$FTP_HOST" \
+            -e "
+              set ftp:ssl-force true;
+              set ftp:ssl-auth TLS;
+              set ftp:ssl-protect-data true;
+              set ftp:ssl-protect-list true;
+              set ftp:passive-mode true;
+              set ftp:ssl-data-use-keys false;
+              set ssl:verify-certificate true;
+              set net:timeout 20;
+              set net:max-retries 2;
+              get /default/config/minion/stats.db -o stats.db;
+              bye;
+            "
 
           if [ ! -s stats.db ]; then
             echo "::error::stats.db was not downloaded or is empty"
