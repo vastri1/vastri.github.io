@@ -5,112 +5,26 @@ on:
 
 jobs:
   sync:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
 
     permissions:
       contents: write
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
+      - uses: actions/checkout@v4
 
-      - name: Verify FTP configuration
-        env:
-          FTP_USER: ${{ secrets.FTP_USER }}
-          FTP_PASS: ${{ secrets.FTP_PASS }}
-          FTP_HOST: ${{ secrets.FTP_HOST }}
-          FTP_PORT: ${{ secrets.FTP_PORT }}
+      - name: Download stats.db via FTP
         run: |
-          set -euo pipefail
+          curl --disable-epsv \
+            -u "${{ secrets.FTP_USER }}:${{ secrets.FTP_PASS }}" \
+            "ftp://${{ secrets.FTP_HOST }}:${{ secrets.FTP_PORT }}/default/config/minion/stats.db" \
+            -o stats.db
 
-          test -n "$FTP_USER" || {
-            echo "::error::FTP_USER secret is missing"
-            exit 1
-          }
-
-          test -n "$FTP_PASS" || {
-            echo "::error::FTP_PASS secret is missing"
-            exit 1
-          }
-
-          test -n "$FTP_HOST" || {
-            echo "::error::FTP_HOST secret is missing"
-            exit 1
-          }
-
-          test -n "$FTP_PORT" || {
-            echo "::error::FTP_PORT secret is missing"
-            exit 1
-          }
-
-          echo "FTP configuration is present."
-
-      - name: Install lftp
+      - name: Commit and push
         run: |
-          sudo apt-get update
-          sudo apt-get install -y lftp
-
-          echo "Installed:"
-          lftp --version | head -1
-
-      - name: Download stats.db from Apex
-        env:
-          FTP_USER: ${{ secrets.FTP_USER }}
-          FTP_PASS: ${{ secrets.FTP_PASS }}
-          FTP_HOST: ${{ secrets.FTP_HOST }}
-          FTP_PORT: ${{ secrets.FTP_PORT }}
-        run: |
-          set -euo pipefail
-
-          echo "Downloading stats.db using explicit FTPS with TLS 1.2..."
-
-          lftp \
-            -u "$FTP_USER","$FTP_PASS" \
-            -p "$FTP_PORT" \
-            "$FTP_HOST" \
-            -e "
-              set ftp:ssl-force true;
-              set ftp:ssl-auth TLS;
-              set ftp:ssl-protect-data true;
-              set ftp:ssl-protect-list true;
-
-              set ftp:passive-mode true;
-
-              set ftp:ssl-data-use-keys false;
-
-              set ssl:priority \"NORMAL:-VERS-SSL3.0:-VERS-TLS1.0:-VERS-TLS1.1:+VERS-TLS1.2:-VERS-TLS1.3\";
-
-              set ssl:verify-certificate true;
-
-              set net:timeout 20;
-              set net:max-retries 2;
-
-              get /default/config/minion/stats.db -o stats.db;
-
-              bye;
-            "
-
-          if [ ! -s stats.db ]; then
-            echo "::error::stats.db was not downloaded or is empty"
-            exit 1
-          fi
-
-          echo "stats.db downloaded successfully."
-          ls -lh stats.db
-
-      - name: Commit and push stats.db
-        run: |
-          set -euo pipefail
-
           git config user.name "github-actions"
           git config user.email "actions@github.com"
 
           git add stats.db
-
-          if git diff --staged --quiet; then
-            echo "stats.db has not changed. Nothing to commit."
-            exit 0
-          fi
-
-          git commit -m "auto update stats"
+          git diff --staged --quiet || git commit -m "auto update stats"
           git push
