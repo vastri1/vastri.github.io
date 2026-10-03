@@ -370,6 +370,14 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
 // ── STATE ────────────────────────────────────────────────────────────────────
 let allRows = [], headers = [], sortCol = 'Survival Wins', sortAsc = false;
 
+// A player needs at least this many games played to be listed under "Best K/D".
+const MIN_GAMES_FOR_KD = 5;
+
+// Placements are fixed (Survival Wins > Team Wins > Kills) and don't change when
+// you sort by another column. Built once per load by buildPlacements().
+let placementIndex = new Map(); // row -> position in the official leaderboard order
+let rankMap = new Map();        // row -> number shown in the # column (null -> —)
+
 // ── HELPERS ──────────────────────────────────────────────────────────────────
 function isNum(col) {
   return allRows.some(r => r[col] !== '' && !isNaN(+String(r[col]).replace(/,/g,'')));
@@ -380,6 +388,7 @@ function textCol() { return headers.find(h => !isNum(h)) || headers[0]; }
 
 // ── RENDER ───────────────────────────────────────────────────────────────────
 function render() {
+  buildPlacements();
   renderCards();
   renderThead();
   applySort();
@@ -400,14 +409,29 @@ function renderCards() {
   const kTop = allRows[kVals.indexOf(kMax)]?.[playerCol] || '?';
  
   // Card 3: Best K/D (Kills / (PvP Deaths + PvE Deaths))
-  const kdaVals = allRows.map(r => {
+  // Only players with MIN_GAMES_FOR_KD or more games played are eligible.
+  let kdMax = null, kdTop = null;
+  allRows.forEach(r => {
+    if (toNum(r['Games Played']) < MIN_GAMES_FOR_KD) return;
     const k = toNum(r['Kills']);
     const d = toNum(r['PvP Deaths']) + toNum(r['PvE Deaths']);
-    return d > 0 ? k / d : k;
+    const kd = d > 0 ? k / d : k;
+    if (kdMax === null || kd > kdMax) { kdMax = kd; kdTop = r[playerCol]; }
   });
-  const kdaMax = Math.max(...kdaVals);
-  const kdaTop = allRows[kdaVals.indexOf(kdaMax)]?.[playerCol] || '?';
- 
+  const kdHtml = kdTop === null
+    ? `<div class="card" title="Minimum ${MIN_GAMES_FOR_KD} games played">
+      <div class="card-label">Best K/D</div>
+      <div class="card-value">—</div>
+      <div class="card-sub">Needs ${MIN_GAMES_FOR_KD}+ games played</div>
+    </div>`
+    : `<div class="card" title="Minimum ${MIN_GAMES_FOR_KD} games played">
+      <div class="card-label">Best K/D</div>
+      <div class="card-value">${kdMax.toFixed(2)}</div>
+      <div class="card-sub" style="display:flex;align-items:center;gap:0.35rem;">
+        <img src="https://mc-heads.net/avatar/${encodeURIComponent(kdTop)}/16" style="width:16px;height:16px;border-radius:2px;image-rendering:pixelated;flex-shrink:0;" onerror="this.style.display='none'" />${kdTop}
+      </div>
+    </div>`;
+
   // Card 4: Total Players
   const total = allRows.length;
  
@@ -426,13 +450,7 @@ function renderCards() {
         <img src="https://mc-heads.net/avatar/${encodeURIComponent(kTop)}/16" style="width:16px;height:16px;border-radius:2px;image-rendering:pixelated;flex-shrink:0;" onerror="this.style.display='none'" />${kTop}
       </div>
     </div>
-    <div class="card">
-      <div class="card-label">Best K/D</div>
-      <div class="card-value">${kdaMax.toFixed(2)}</div>
-      <div class="card-sub" style="display:flex;align-items:center;gap:0.35rem;">
-        <img src="https://mc-heads.net/avatar/${encodeURIComponent(kdaTop)}/16" style="width:16px;height:16px;border-radius:2px;image-rendering:pixelated;flex-shrink:0;" onerror="this.style.display='none'" />${kdaTop}
-      </div>
-    </div>
+    ${kdHtml}
     <div class="card">
       <div class="card-label">Total Players</div>
       <div class="card-value">${total}</div>
@@ -476,31 +494,60 @@ function statKey(row) {
   return `${toNum(row['Survival Wins'])}_${toNum(row['Team Wins'])}_${toNum(row['Kills'])}`;
 }
 
-function applySort() {
-  // Players with 0 games played go to the very bottom (shown with —), shuffled
-  // Players with games but no stats go just above them, shuffled, with a number
-  const withStats = allRows.filter(r => !hasNoStats(r) && !hasNoGames(r));
-  const noStats   = allRows.filter(r =>  hasNoStats(r)).sort(() => Math.random() - 0.5);
-  const noGames   = allRows.filter(r =>  hasNoGames(r)).sort(() => Math.random() - 0.5);
+// Builds the official leaderboard order and each player's placement number.
+// Players with stats are ordered by Survival Wins, then Team Wins, then Kills.
+// Players who played but have no stats follow (shuffled once per page load),
+// then players with no games (shown as —).
+function buildPlacements() {
+  const shuffle = arr => arr.sort(() => Math.random() - 0.5);
+  const withStats = allRows.filter(r => !hasNoStats(r) && !hasNoGames(r)).sort((a, b) =>
+       toNum(b['Survival Wins']) - toNum(a['Survival Wins'])
+    || toNum(b['Team Wins'])     - toNum(a['Team Wins'])
+    || toNum(b['Kills'])         - toNum(a['Kills']));
+  const noStats = shuffle(allRows.filter(r => hasNoStats(r)));
+  const noGames = shuffle(allRows.filter(r => hasNoGames(r)));
+  const order = [...withStats, ...noStats, ...noGames];
 
-  if (sortCol && sortCol !== '#') {
-    withStats.sort((a, b) => {
-      const av = a[sortCol]||'', bv = b[sortCol]||'';
-      const an = parseFloat(String(av).replace(/,/g,'')), bn = parseFloat(String(bv).replace(/,/g,''));
-      // Primary column
-      let cmp;
-      if (!isNaN(an) && !isNaN(bn)) cmp = sortAsc ? an - bn : bn - an;
-      else cmp = sortAsc ? av.localeCompare(bv) : bv.localeCompare(av);
-      if (cmp !== 0) return cmp;
-      // Tiebreaker 1: most Team Wins
-      const tw = toNum(b['Team Wins']) - toNum(a['Team Wins']);
-      if (tw !== 0) return tw;
-      // Tiebreaker 2: most Kills
-      return toNum(b['Kills']) - toNum(a['Kills']);
+  placementIndex = new Map(order.map((row, i) => [row, i]));
+
+  // Dense ranking: two players share a rank only when their Survival Wins,
+  // Team Wins, AND Kills are all identical. Each new unique combo increments
+  // the rank by 1 (never skips numbers). No-games players get null (-> —).
+  rankMap = new Map();
+  const seenKeys = new Map(); // statKey -> assigned rank
+  let nextRank = 1;
+  for (const row of withStats) {
+    const key = statKey(row);
+    if (!seenKeys.has(key)) seenKeys.set(key, nextRank++);
+    rankMap.set(row, seenKeys.get(key));
+  }
+  // Played but no stats: sequential numbers after the ranked players
+  for (const row of noStats) rankMap.set(row, nextRank++);
+  for (const row of noGames) rankMap.set(row, null);
+}
+
+function applySort() {
+  const rows = [...allRows];
+  const byPlacement = (a, b) => placementIndex.get(a) - placementIndex.get(b);
+
+  if (sortCol === '#') {
+    rows.sort(byPlacement);              // 1 -> N
+    if (sortAsc) rows.reverse();         // second click: N -> 1
+  } else if (sortCol) {
+    // Every player is sorted by the chosen column. Ties fall back to placement.
+    const numeric = isNum(sortCol);
+    rows.sort((a, b) => {
+      let cmp = numeric
+        ? toNum(a[sortCol]) - toNum(b[sortCol])
+        : String(a[sortCol] || '').localeCompare(String(b[sortCol] || ''));
+      if (!sortAsc) cmp = -cmp;
+      return cmp || byPlacement(a, b);
     });
+  } else {
+    rows.sort(byPlacement);
   }
 
-  renderTbody([...withStats, ...noStats, ...noGames]);
+  renderTbody(rows);
 }
 
 function updateSortIcons() {
@@ -525,27 +572,6 @@ function renderTbody(data) {
   document.getElementById('no-results').style.display = filtered.length ? 'none' : 'block';
 
   const MEDALS = ['🥇','🥈','🥉'];
-
-  // Dense ranking: two players share a rank only when their Survival Wins,
-  // Team Wins, AND Kills are all identical. Each new unique combo increments
-  // the rank by 1 (never skips numbers). No-stat players get rank null (→ —).
-  const rankMap = new Map();
-  const seenKeys = new Map(); // statKey → assigned rank
-  let nextRank = 1;
-  for (const row of data) {
-    if (hasNoStats(row) || hasNoGames(row)) continue;
-    const key = statKey(row);
-    if (!seenKeys.has(key)) seenKeys.set(key, nextRank++);
-    rankMap.set(row, seenKeys.get(key));
-  }
-  // No-stat (but played) players get sequential numbers after ranked players
-  for (const row of data) {
-    if (hasNoStats(row)) rankMap.set(row, nextRank++);
-  }
-  // No-games players get null → shown as —
-  for (const row of data) {
-    if (hasNoGames(row)) rankMap.set(row, null);
-  }
 
   document.getElementById('tbody').innerHTML = filtered.map((row) => {
     const rank = rankMap.get(row);
