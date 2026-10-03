@@ -58,6 +58,9 @@ jobs:
 
           curl \
             --ssl-reqd \
+            --disable-epsv \
+            --ftp-pasv \
+            --ftp-skip-pasv-ip \
             --fail \
             --show-error \
             --connect-timeout 20 \
