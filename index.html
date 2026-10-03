@@ -12,7 +12,7 @@
 </script>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>MinionUHC Stats</title>
+<title>MinionUHC Stats – Season 2</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.2/sql-wasm.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -272,6 +272,35 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
   padding-top: 0.65rem;
   margin-top: 0.65rem;
 }
+
+/* SEASON SWITCHER */
+.season-wrap { position: relative; }
+.season-dropdown {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 210px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+}
+.season-dropdown.open { display: block; }
+.season-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.5rem 0.65rem;
+  border-radius: 4px;
+  font-size: 13px;
+  color: var(--text);
+  text-decoration: none;
+}
+.season-item:hover, .season-item:focus-visible { background: var(--bg); outline: none; }
+.season-item.active { font-weight: bold; }
+.season-tag { font-size: 11px; font-weight: normal; color: var(--muted); }
+.season-caret { font-size: 10px; margin-left: 2px; }
 </style>
 </head>
 <body>
@@ -281,7 +310,7 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
     <div class="logo">
       <img src="https://mc-heads.net/avatar/DavidBry/30" style="width:30px;height:30px;border-radius:4px;flex-shrink:0;image-rendering:pixelated;" alt="MinionUHC" />
       <div class="logo-text">Minion<span>UHC</span></div>
-      <div class="logo-season">Season 1</div>
+      <div class="logo-season">Season 2</div>
     </div>
     <div class="header-right" id="header-right" style="display:flex">
       <div class="placement-wrap">
@@ -292,6 +321,13 @@ tbody td { padding: 0.65rem 1rem; vertical-align: middle; }
         </div>
       </div>
       <button class="btn btn-ghost" id="theme-toggle" onclick="toggleTheme()">☀ Light</button>
+      <div class="season-wrap">
+        <button class="btn btn-ghost" id="season-btn" onclick="toggleSeasonMenu(event)" aria-haspopup="true" aria-expanded="false">Seasons <span class="season-caret">▾</span></button>
+        <div class="season-dropdown" id="season-dropdown" role="menu">
+          <a class="season-item active" href="index.html" role="menuitem" aria-current="page">Season 2 <span class="season-tag">Current</span></a>
+          <a class="season-item" href="season1.html" role="menuitem">Season 1 <span class="season-tag">Archive</span></a>
+        </div>
+      </div>
       <div class="social-links">
         <a class="social-btn" href="https://www.twitch.tv/minionuhc" target="_blank" rel="noopener" title="Twitch">
           <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714z"/></svg>
@@ -684,6 +720,7 @@ window.addEventListener('DOMContentLoaded', () => {
 // ── PLACEMENTS DROPDOWN ───────────────────────────────────────────────────────
 function togglePlacement(e) {
   e.stopPropagation();
+  closeSeasonMenu();
   document.getElementById('placement-dropdown').classList.toggle('open');
 }
 document.addEventListener('click', function(e) {
@@ -691,6 +728,28 @@ document.addEventListener('click', function(e) {
   if (wrap && !wrap.contains(e.target)) {
     document.getElementById('placement-dropdown').classList.remove('open');
   }
+});
+
+// ── SEASON SWITCHER ───────────────────────────────────────────────────────────
+function closeSeasonMenu() {
+  const dd = document.getElementById('season-dropdown');
+  const btn = document.getElementById('season-btn');
+  if (dd) dd.classList.remove('open');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+function toggleSeasonMenu(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('season-dropdown');
+  const open = dd.classList.toggle('open');
+  document.getElementById('season-btn').setAttribute('aria-expanded', String(open));
+  document.getElementById('placement-dropdown').classList.remove('open');
+}
+document.addEventListener('click', function(e) {
+  const wrap = document.querySelector('.season-wrap');
+  if (wrap && !wrap.contains(e.target)) closeSeasonMenu();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeSeasonMenu();
 });
 
 // ── DARK MODE ─────────────────────────────────────────────────────────────────
