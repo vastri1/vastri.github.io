@@ -46,7 +46,7 @@ jobs:
           : "${FTP_USER:?Missing FTP_USER secret}"
           : "${FTP_PASS:?Missing FTP_PASS secret}"
 
-          curl --fail --show-error \
+          curl --verbose --fail --show-error \
             --knownhosts "$HOME/.ssh/known_hosts" \
             --user "$FTP_USER:$FTP_PASS" \
             "sftp://${FTP_HOST}:${FTP_PORT}/default/config/minion/stats.db" \
